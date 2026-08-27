@@ -1,85 +1,111 @@
-"use server";
+"use server"; // Merkitsee tiedoston sisältämät funktiot Next.js Server Actioneiksi (ajetaan vain palvelimella)
 
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { db } from "@/db";
 import { posts } from "@/db/schema";
 import { postFormSchema, postIdSchema, type PostFormValues } from "@/lib/validations/post";
 
-type ActionResult = {
+// Tyyppimäärittely palvelintoimintojen palauttamille validointivirheille
+export type ActionResult = {
   fieldErrors?: Partial<Record<keyof PostFormValues, string[]>>;
 } | undefined;
 
-function isUniqueViolation(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const code = (err as { code?: string }).code ?? (err.cause as { code?: string } | undefined)?.code;
-  return code === "23505";
-}
-
+/**
+ * Luo uuden blogikirjoituksen tietokantaan.
+ * 
+ * @param values - Lomakkeelta saadut syötteet
+ * @returns Validoinnin tai tietokannan virheet, jos tallennus epäonnistuu
+ */
 export async function createPost(values: PostFormValues): Promise<ActionResult> {
+  // Validoidaan lomakesyötteet Zod-skeemalla
   const parsed = postFormSchema.safeParse(values);
   if (!parsed.success) {
-    return { fieldErrors: parsed.error.flatten().fieldErrors };
+    // Jos validointi epäonnistuu, palautetaan kenttäkohtaiset virheviestit
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
-  let slug: string;
   try {
-    const [post] = await db.insert(posts).values(parsed.data).returning();
-    slug = post.slug;
+    // Tallennetaan uusi postaus tietokantaan
+    await db.insert(posts).values(parsed.data);
   } catch (err) {
-    if (isUniqueViolation(err)) {
+    // Käsillään MySQL/MariaDB:n uniikkiusvirhe (esim. jo käytössä oleva slug)
+    if ((err as { code?: string }).code === "ER_DUP_ENTRY") {
       return { fieldErrors: { slug: ["This slug is already taken."] } };
     }
-    throw err;
+    throw err; // Heitetään muut tuntemattomat virheet eteenpäin
   }
 
+  // Tyhjennetään blogilistauksen välimuisti ja ohjataan käyttäjä uuteen postaukseen
   revalidatePath("/blog");
-  redirect(`/blog/${slug}`);
+  redirect(`/blog/${parsed.data.slug}`);
 }
 
+/**
+ * Päivittää olemassa olevan blogikirjoituksen tiedot.
+ * 
+ * @param id - Päivitettävän postauksen ID
+ * @param values - Lomakkeelta saadut uudet syötteet
+ * @returns Validoinnin tai tietokannan virheet, jos päivitys epäonnistuu
+ */
 export async function updatePost(
   id: number,
   values: PostFormValues
 ): Promise<ActionResult> {
+  // Validoidaan sekä postauksen ID että lomaketiedot
   const parsedId = postIdSchema.safeParse(id);
   const parsed = postFormSchema.safeParse(values);
+  
   if (!parsedId.success || !parsed.success) {
-    return { fieldErrors: parsed.success ? undefined : parsed.error.flatten().fieldErrors };
+    return { fieldErrors: parsed.success ? undefined : z.flattenError(parsed.error).fieldErrors };
   }
 
-  let slug: string;
   try {
-    const [post] = await db
+    // Päivitetään postauksen tiedot tietokantaan ID:n perusteella
+    const [result] = await db
       .update(posts)
       .set(parsed.data)
-      .where(eq(posts.id, parsedId.data))
-      .returning();
-    if (!post) {
+      .where(eq(posts.id, parsedId.data));
+    
+    // Jos yhtään riviä ei muokattu, postausta ei ollut olemassa
+    if (result.affectedRows === 0) {
       return { fieldErrors: { title: ["This post no longer exists."] } };
     }
-    slug = post.slug;
   } catch (err) {
-    if (isUniqueViolation(err)) {
+    // Käsillään duplikaattivirhe (esim. slug on jo toisen postauksen käytössä)
+    if ((err as { code?: string }).code === "ER_DUP_ENTRY") {
       return { fieldErrors: { slug: ["This slug is already taken."] } };
     }
     throw err;
   }
 
+  const slug = parsed.data.slug;
+  // Tyhjennetään välimuisti sekä blogilistaukselta että muokatulta postaukselta
   revalidatePath("/blog");
   revalidatePath(`/blog/${slug}`);
+  // Ohjataan käyttäjä päivitettyyn postaukseen
   redirect(`/blog/${slug}`);
 }
 
+/**
+ * Poistaa blogikirjoituksen tietokannasta.
+ * 
+ * @param id - Poistettavan postauksen ID
+ */
 export async function deletePost(id: number): Promise<void> {
+  // Validoidaan ID
   const parsedId = postIdSchema.safeParse(id);
   if (!parsedId.success) {
     return;
   }
 
+  // Poistetaan postaus tietokannasta
   await db.delete(posts).where(eq(posts.id, parsedId.data));
 
+  // Päivitetään blogilistauksen välimuisti ja ohjataan käyttäjä takaisin listaukseen
   revalidatePath("/blog");
   redirect("/blog");
 }
