@@ -1,54 +1,42 @@
-"use client";
-
-import { useTransition } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-import { createPost, updatePost } from "@/app/blog/actions";
-import { postFormSchema, type PostFormValues } from "@/lib/validations/post";
+"use client"
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel
 } from "@/components/ui/field";
-
-type PostFormProps =
-  | { mode: "create" }
-  | { mode: "edit"; post: { id: number; title: string; slug: string; content: string } };
-
-
+import { useForm } from "react-hook-form";
+import { postFormSchema, PostFormValues } from "@/lib/validators/posts";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useTransition } from "react";
+import { createPost } from "@/app/blog/actions";
+import { updatePost } from "@/app/blog/actions";
+type PostFormProps =   {mode: "create"} | {mode: "edit"; post:{id: string, title: string, slug: string, content: string}}
 
 export function PostForm(props: PostFormProps) {
-  const [isPending, startTransition] = useTransition();
-  const form = useForm<PostFormValues>({
-    resolver: zodResolver(postFormSchema),
-    defaultValues:
-      props.mode === "edit"
-        ? { title: props.post.title, slug: props.post.slug, content: props.post.content }
-        : { title: "", slug: "", content: "" },
-  });
-
-  const onSubmit = form.handleSubmit((values) => {
-    startTransition(async () => {
-      const result =
-        props.mode === "create"
-          ? await createPost(values)
-          : await updatePost(props.post.id, values);
-
-      if (result?.fieldErrors) {
-        for (const [field, messages] of Object.entries(result.fieldErrors)) {
-          if (messages?.length) {
-            form.setError(field as keyof PostFormValues, { message: messages[0] });
-          }
-        }
-      }
+    const [isPending, startTransition] = useTransition();
+    const form = useForm<PostFormValues>({
+        resolver:zodResolver(postFormSchema),
+        defaultValues: props.mode === "edit" ?
+         {title: props.post.title, slug: props.post.slug, content: props.post.content} :
+         {title: "", slug: "", content: ""}
     });
-  });
+    const onSubmit = form.handleSubmit((values) => {
+        startTransition(async() => {
+            const result = props.mode === "create" ? await createPost(values) : await updatePost({...values, id: props.post.id});
+            if (result?.fieldErrors){
+                for(const [field, messages] of Object.entries(result.fieldErrors)){
+                    if (messages?.length){
+                        form.setError(field as keyof PostFormValues, {message: messages[0]});
+                    }
+                }
+            }
+        });
+    })
 
   return (
     <form onSubmit={onSubmit} noValidate>
@@ -63,7 +51,7 @@ export function PostForm(props: PostFormProps) {
           />
           <FieldError errors={form.formState.errors.title ? [form.formState.errors.title] : undefined} />
         </Field>
-
+ 
         <Field data-invalid={!!form.formState.errors.slug}>
           <FieldLabel htmlFor="slug">Slug</FieldLabel>
           <Input
@@ -75,7 +63,7 @@ export function PostForm(props: PostFormProps) {
           <FieldDescription>Used in the post URL, e.g. /blog/my-post</FieldDescription>
           <FieldError errors={form.formState.errors.slug ? [form.formState.errors.slug] : undefined} />
         </Field>
-
+ 
         <Field data-invalid={!!form.formState.errors.content}>
           <FieldLabel htmlFor="content">Content</FieldLabel>
           <Textarea
@@ -86,7 +74,7 @@ export function PostForm(props: PostFormProps) {
           />
           <FieldError errors={form.formState.errors.content ? [form.formState.errors.content] : undefined} />
         </Field>
-
+ 
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving..." : props.mode === "create" ? "Create post" : "Save changes"}
         </Button>
@@ -94,3 +82,4 @@ export function PostForm(props: PostFormProps) {
     </form>
   );
 }
+
