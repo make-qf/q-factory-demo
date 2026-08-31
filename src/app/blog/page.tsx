@@ -21,11 +21,12 @@ export default async function BlogPage() {
             {allPosts.length === 0 ? (
                 <p className="text-gray-600">No posts available.</p>
             ) : (
-                <Table>
+                <Table className="w-half mt-4">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Title</TableHead>
                             <TableHead>Created At</TableHead>
+                            <TableHead>Updated At</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -34,6 +35,18 @@ export default async function BlogPage() {
                             <TableRow key={post.id}>
                                 <TableCell>{post.title}</TableCell>
                                 <TableCell>{post.createdAt.toLocaleDateString()}</TableCell>
+                                <TableCell>{post.updatedAt?.toLocaleTimeString()}</TableCell>
+                                <TableCell className="text-left space-x-2">
+                                    <Button
+                                        render={<Link href={`/blog/${post.slug}`}>View</Link>}
+                                    />
+                                    <Button
+                                        render={<Link href={`/blog/${post.slug}/edit`}>Edit</Link>}
+                                    />
+                                    <Button
+                                        render={<Link href={`/blog/${post.slug}/delete`}>Delete</Link>}
+                                    />
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

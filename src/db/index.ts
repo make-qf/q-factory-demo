@@ -23,5 +23,12 @@ import mysql from "mysql2/promise";
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
-const connection = mysql.createPool(process.env.DATABASE_URL);
+
+// Keep MySQL timestamps consistent with the server/app timezone so `$onUpdate()`
+// doesn't drift by the DB server's UTC offset during writes.
+const connection = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  timezone: "local",
+});
+
 export const db = drizzle(connection, { schema, mode: "default" });

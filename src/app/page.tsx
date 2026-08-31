@@ -6,7 +6,6 @@ import {
     Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { desc } from "drizzle-orm";
-import { blog-post}
  
 export default async function Home() {
  const allPosts = await db.select().from(posts).orderBy(desc(posts.createdAt)).limit(3);
@@ -24,6 +23,7 @@ export default async function Home() {
                 <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Created At</TableHead>
+                    <TableHead>Updated At</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -35,6 +35,7 @@ export default async function Home() {
                             </Link>
                         </TableCell>
                         <TableCell>{post.createdAt.toLocaleDateString()}</TableCell>
+                        <TableCell>{post.updatedAt?.toLocaleDateString()}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>

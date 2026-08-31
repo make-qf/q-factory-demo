@@ -14,6 +14,7 @@ import { postFormSchema, PostFormValues } from "@/lib/validators/posts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition } from "react";
 import { createPost } from "@/app/blog/actions";
+import { updatePost } from "@/app/blog/actions";
 type PostFormProps =   {mode: "create"} | {mode: "edit"; post:{id: string, title: string, slug: string, content: string}}
 
 export function PostForm(props: PostFormProps) {
@@ -26,7 +27,7 @@ export function PostForm(props: PostFormProps) {
     });
     const onSubmit = form.handleSubmit((values) => {
         startTransition(async() => {
-            const result = props.mode === "create" ? await createPost(values) : await createPost(values);
+            const result = props.mode === "create" ? await createPost(values) : await updatePost({...values, id: props.post.id});
             if (result?.fieldErrors){
                 for(const [field, messages] of Object.entries(result.fieldErrors)){
                     if (messages?.length){

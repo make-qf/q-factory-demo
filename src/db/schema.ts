@@ -29,5 +29,5 @@ export const posts = mysqlTable("posts", {
   updatedAt: mysqlTimestamp("updated_at")
     .notNull()
     .defaultNow()
-    .$onUpdate(() => new Date()),
+    .onUpdateNow(),
 });
